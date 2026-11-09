@@ -95,17 +95,25 @@ python main.py
 
 HADA cuenta con un motor de clonación y personalización en `voices/`:
 
-1. **Crear una voz híbrida única (Voice Blending)**:
+1. **Clonar a partir de un archivo de audio (.wav, .mp3, .ogg, .flac)**:
+   Coloca tu archivo en la carpeta `voices/` (o pasa la ruta completa) y ejecútalo:
+   ```text
+   /clonar_audio mi_voz.wav
+   /clonar_audio "C:/audios/actor.mp3" voz_actor
+   ```
+   HADA analizará el tono, timbre y brillo de tu archivo y creará el perfil `.npy` en segundos.
+
+2. **Crear una voz híbrida única (Voice Blending)**:
    Puedes mezclar proporciones de timbres existentes para dar con la personalidad exacta que buscas:
    ```text
    /clonar_mezcla mi_hada ef_dora:0.65 af_bella:0.35
    ```
    Esto genera un archivo `voices/mi_hada.npy` que puedes reutilizar siempre que quieras con `/voz_estilo mi_hada`.
 
-2. **Cargar voces externas de la comunidad**:
+3. **Cargar voces externas de la comunidad**:
    Cualquier archivo de voz de Kokoro en formato `.npy` o `.json` puede colocarse dentro de la carpeta `voices/` y activarse al instante.
 
-3. **Grabar tu propia voz como referencia**:
+4. **Grabar tu propia voz como referencia**:
    ```text
    /grabar_voz 5
    ```

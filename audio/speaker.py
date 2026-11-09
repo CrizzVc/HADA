@@ -200,6 +200,14 @@ class KokoroSpeaker:
             self.voice = output_name
         return ok, msg
 
+    def clone_voice_from_audio(self, audio_path: str, output_name: str):
+        """Clona una voz a partir de un archivo de audio y la activa."""
+        self._init_tts()
+        ok, msg, stats = self.cloner.clone_from_audio_file(audio_path, output_name)
+        if ok:
+            self.voice = output_name
+        return ok, msg, stats
+
     def list_custom_voices(self):
         """Lista las voces guardadas en 'voices/'."""
         return self.cloner.list_custom_voices()

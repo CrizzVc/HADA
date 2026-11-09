@@ -110,6 +110,40 @@ def main():
                 msg += "\n\n[dim]No hay voces clonadas aún en 'voices/'. Usa /clonar_mezcla para crear una.[/dim]"
             console.print(msg)
             continue
+        elif cmd.startswith("/clonar_audio"):
+            # Sintaxis: /clonar_audio <archivo> [nombre_resultado]
+            # Ej: /clonar_audio mi_audio.wav
+            # Ej: /clonar_audio "C:/audios/actor.mp3" voz_actor
+            parts = user_input.split(maxsplit=2)
+            if len(parts) < 2:
+                console.print(
+                    "[yellow]Uso: /clonar_audio <archivo_de_audio> [nombre_resultado][/yellow]\n"
+                    "Ejemplo: [cyan]/clonar_audio mi_voz.wav[/cyan]\n"
+                    "Ejemplo: [cyan]/clonar_audio sample.mp3 hada_personal[/cyan]"
+                )
+                continue
+            
+            raw_path = parts[1].strip("\"'")
+            if len(parts) > 2:
+                out_name = parts[2].strip()
+            else:
+                from pathlib import Path
+                out_name = Path(raw_path).stem
+            
+            console.print(f"[cyan]Analizando propiedades acústicas de '{raw_path}'...[/cyan]")
+            ok, msg, stats = speaker.clone_voice_from_audio(raw_path, out_name)
+            if ok:
+                console.print(
+                    f"[bold green]✓ {msg}[/bold green]\n"
+                    f"  • [bold]Tono medio (F0):[/bold] {stats.get('pitch_f0')} Hz ({stats.get('gender')})\n"
+                    f"  • [bold]Brillo espectral:[/bold] {stats.get('spectral_centroid')} Hz\n"
+                    f"  • [bold]Duración analizada:[/bold] {stats.get('duration')}s\n"
+                    f"  • [bold]Fórmula de mezcla:[/bold] {stats.get('blend_weights')}\n"
+                    f"[magenta]Hada ahora hablará con el perfil clonado de '{out_name}'.[/magenta]"
+                )
+            else:
+                console.print(f"[red]Error al clonar audio: {msg}[/red]")
+            continue
         elif cmd.startswith("/clonar_mezcla"):
             # Sintaxis: /clonar_mezcla <nombre> <voz1:peso> <voz2:peso>
             # Ej: /clonar_mezcla mi_hada ef_dora:0.6 af_bella:0.4
@@ -177,6 +211,7 @@ def main():
                 "  /voz                     - Activar/Desactivar voz de Hada\n"
                 "  /voces                   - Ver voces estándar y clonadas disponibles\n"
                 "  /voz_estilo [voz]        - Cambiar voz activa (ej: ef_dora, hada_dulce)\n"
+                "  /clonar_audio <arch> [n] - Clonar voz desde un archivo (.wav, .mp3)\n"
                 "  /clonar_mezcla <nom> ... - Crear voz híbrida (ej: /clonar_mezcla mi_hada ef_dora:0.7 af_bella:0.3)\n"
                 "  /grabar_voz [segs]       - Grabar muestra de micrófono a voices/mi_voz_referencia.wav\n"
                 "  /velocidad [valor]       - Ajustar velocidad (ej: 0.95, 1.0)\n"
