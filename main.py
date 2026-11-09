@@ -100,14 +100,63 @@ def main():
                 _, status = assistant.check_connection()
                 console.print(status)
             continue
+        elif cmd == "/voces":
+            customs = speaker.list_custom_voices()
+            std_voices = ["ef_dora (Español fem)", "em_alex (Español masc)", "em_santa (Español masc)", "af_bella", "af_sarah", "af_nicole", "am_michael", "am_adam"]
+            msg = "[bold cyan]Voces estándar recomendadas:[/bold cyan]\n  " + ", ".join(std_voices)
+            if customs:
+                msg += f"\n\n[bold green]Voces clonadas/personalizadas ('voices/'):[/bold green]\n  " + ", ".join(customs)
+            else:
+                msg += "\n\n[dim]No hay voces clonadas aún en 'voices/'. Usa /clonar_mezcla para crear una.[/dim]"
+            console.print(msg)
+            continue
+        elif cmd.startswith("/clonar_mezcla"):
+            # Sintaxis: /clonar_mezcla <nombre> <voz1:peso> <voz2:peso>
+            # Ej: /clonar_mezcla mi_hada ef_dora:0.6 af_bella:0.4
+            parts = user_input.split()
+            if len(parts) < 3:
+                console.print("[yellow]Uso: /clonar_mezcla <nombre> <voz1:peso> <voz2:peso>[/yellow]\nEjemplo: [cyan]/clonar_mezcla hada_dulce ef_dora:0.7 af_bella:0.3[/cyan]")
+                continue
+            out_name = parts[1].strip()
+            specs = {}
+            for p in parts[2:]:
+                if ":" in p:
+                    v_name, weight_str = p.split(":", 1)
+                    try:
+                        specs[v_name.strip()] = float(weight_str)
+                    except ValueError:
+                        pass
+            if not specs:
+                console.print("[red]No se pudieron leer las proporciones de voces.[/red]")
+                continue
+            
+            console.print(f"[cyan]Sintetizando y clonando vector para '{out_name}' con {specs}...[/cyan]")
+            ok, msg = speaker.blend_voice(specs, out_name)
+            if ok:
+                console.print(f"[bold green]✓ {msg}[/bold green]\n[magenta]Hada ahora hablará con esta nueva voz clonada.[/magenta]")
+            else:
+                console.print(f"[red]Error: {msg}[/red]")
+            continue
+        elif cmd.startswith("/grabar_voz"):
+            parts = user_input.split()
+            secs = 5
+            if len(parts) > 1 and parts[1].isdigit():
+                secs = int(parts[1])
+            console.print(f"[bold red]🎙️ Grabando {secs} segundos de tu voz... ¡Habla ahora![/bold red]")
+            ok, msg = speaker.cloner.record_microphone_sample("mi_voz_referencia.wav", seconds=secs)
+            if ok:
+                console.print(f"[green]✓ {msg}[/green]")
+            else:
+                console.print(f"[red]{msg}[/red]")
+            continue
         elif cmd.startswith("/voz_estilo"):
             parts = user_input.split(maxsplit=1)
             if len(parts) > 1:
                 new_voice = parts[1].strip()
                 speaker.set_voice(new_voice)
-                console.print(f"[green]Voz cambiada a: {new_voice} (ej: ef_dora, em_alex, em_santa)[/green]")
+                console.print(f"[green]Voz cambiada a: {new_voice}[/green]")
             else:
-                console.print(f"[magenta]Voz actual: {speaker.voice}. Voces recomendadas: ef_dora (femenina), em_alex (masculina), em_santa (masculina).[/magenta]")
+                console.print(f"[magenta]Voz actual: {speaker.voice}. Usa /voces para ver la lista completa.[/magenta]")
             continue
         elif cmd.startswith("/velocidad"):
             parts = user_input.split(maxsplit=1)
@@ -124,13 +173,16 @@ def main():
         elif cmd == "/ayuda":
             console.print(
                 "[cyan]Comandos:\n"
-                "  /mic                - Hablar por micrófono\n"
-                "  /voz                - Activar/Desactivar voz de Hada\n"
-                "  /voz_estilo [voz]   - Cambiar voz (ef_dora, em_alex, etc.)\n"
-                "  /velocidad [valor]  - Ajustar velocidad (ej: 0.95, 1.0)\n"
-                "  /modelo [nombre]    - Ver o cambiar el modelo de Ollama\n"
-                "  /limpiar            - Reiniciar conversación\n"
-                "  /salir              - Salir[/cyan]"
+                "  /mic                     - Hablar por micrófono\n"
+                "  /voz                     - Activar/Desactivar voz de Hada\n"
+                "  /voces                   - Ver voces estándar y clonadas disponibles\n"
+                "  /voz_estilo [voz]        - Cambiar voz activa (ej: ef_dora, hada_dulce)\n"
+                "  /clonar_mezcla <nom> ... - Crear voz híbrida (ej: /clonar_mezcla mi_hada ef_dora:0.7 af_bella:0.3)\n"
+                "  /grabar_voz [segs]       - Grabar muestra de micrófono a voices/mi_voz_referencia.wav\n"
+                "  /velocidad [valor]       - Ajustar velocidad (ej: 0.95, 1.0)\n"
+                "  /modelo [nombre]         - Ver o cambiar el modelo de Ollama\n"
+                "  /limpiar                 - Reiniciar conversación\n"
+                "  /salir                   - Salir[/cyan]"
             )
             continue
 

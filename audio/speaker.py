@@ -14,6 +14,7 @@ from config import (
     KOKORO_VOICE,
     KOKORO_VOICES_FILE,
 )
+from .voice_cloner import VoiceCloner
 
 def clean_speech_text(text: str) -> str:
     """Limpia el texto antes de enviarlo a la síntesis de voz."""
@@ -83,6 +84,7 @@ class KokoroSpeaker:
         self.model_file = model_file
         self.voices_file = voices_file
         self.enabled = enabled
+        self.cloner = VoiceCloner()
         
         # Dos colas: una para texto pendiente y otra para audio ya sintetizado
         self.text_queue: queue.Queue[Optional[str]] = queue.Queue()
@@ -113,6 +115,7 @@ class KokoroSpeaker:
             try:
                 from kokoro_onnx import Kokoro
                 self._kokoro = Kokoro(self.model_file, self.voices_file)
+                self.cloner.set_kokoro(self._kokoro)
                 return
             except Exception:
                 pass
@@ -141,10 +144,13 @@ class KokoroSpeaker:
             try:
                 self._init_tts()
                 if self._kokoro is not None:
+                    # Resolver si es una voz estándar o un perfil clonado/mezclado
+                    active_style = self.cloner.resolve_voice(self.voice)
+                    
                     # Generar audio
                     samples, sample_rate = self._kokoro.create(
                         text,
-                        voice=self.voice,
+                        voice=active_style,
                         speed=self.speed,
                         lang=self.lang
                     )
@@ -183,8 +189,20 @@ class KokoroSpeaker:
             self.text_queue.put(cleaned)
 
     def set_voice(self, voice_name: str):
-        """Cambia la voz activa (ej: 'ef_dora', 'em_alex', 'em_santa')."""
+        """Cambia la voz activa (ej: 'ef_dora', 'em_alex', o una voz personalizada de 'voices/')."""
         self.voice = voice_name
+
+    def blend_voice(self, voice_weights: dict, output_name: str):
+        """Crea una nueva voz mezclada y la establece como la voz activa."""
+        self._init_tts()
+        ok, msg = self.cloner.blend_voices(voice_weights, output_name)
+        if ok:
+            self.voice = output_name
+        return ok, msg
+
+    def list_custom_voices(self):
+        """Lista las voces guardadas en 'voices/'."""
+        return self.cloner.list_custom_voices()
 
     def set_speed(self, speed: float):
         """Ajusta la velocidad de habla (ej: 0.9, 0.95, 1.0, 1.1)."""

@@ -79,8 +79,37 @@ python main.py
 * **Escribir**: Escribe cualquier pregunta o petición y presiona `Enter`.
 * **Hablar por voz**: Escribe `/mic` o presiona `Enter` con la línea vacía para activar el micrófono.
 * **Activar/Desactivar voz de Hada**: `/voz`
+* **Ver voces disponibles**: `/voces`
+* **Cambiar de voz**: `/voz_estilo <nombre>`
+* **Clonar / Crear voz híbrida**: `/clonar_mezcla <nombre> <voz1:peso> <voz2:peso>`
+  *(Ejemplo: `/clonar_mezcla hada_dulce ef_dora:0.7 af_bella:0.3`)*
+* **Grabar muestra de micrófono**: `/grabar_voz [segundos]`
+* **Ajustar velocidad**: `/velocidad 0.95`
+* **Cambiar modelo Ollama**: `/modelo [nombre]`
 * **Reiniciar conversación**: `/limpiar`
 * **Salir**: `/salir`
+
+---
+
+## 🎭 Clonación y Personalización de Voces
+
+HADA cuenta con un motor de clonación y personalización en `voices/`:
+
+1. **Crear una voz híbrida única (Voice Blending)**:
+   Puedes mezclar proporciones de timbres existentes para dar con la personalidad exacta que buscas:
+   ```text
+   /clonar_mezcla mi_hada ef_dora:0.65 af_bella:0.35
+   ```
+   Esto genera un archivo `voices/mi_hada.npy` que puedes reutilizar siempre que quieras con `/voz_estilo mi_hada`.
+
+2. **Cargar voces externas de la comunidad**:
+   Cualquier archivo de voz de Kokoro en formato `.npy` o `.json` puede colocarse dentro de la carpeta `voices/` y activarse al instante.
+
+3. **Grabar tu propia voz como referencia**:
+   ```text
+   /grabar_voz 5
+   ```
+   Graba 5 segundos limpios desde tu micrófono y los guarda en `voices/mi_voz_referencia.wav`.
 
 ### Ejemplos de acciones:
 * *"Pausa la música"* o *"Siguiente canción"*
