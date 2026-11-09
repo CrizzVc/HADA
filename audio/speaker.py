@@ -1,39 +1,104 @@
-"""Módulo de síntesis de voz (TTS) con Kokoro-ONNX y cola de reproducción."""
+"""Módulo de síntesis de voz (TTS) con Kokoro-ONNX, pre-renderizado en pipeline y recorte de silencios."""
 import os
 import queue
+import re
 import threading
-from typing import Optional
+from typing import Optional, Tuple
+import numpy as np
 
 from config import (
     DEFAULT_VOICE_OUTPUT,
     KOKORO_LANG,
     KOKORO_MODEL_FILE,
+    KOKORO_SPEED,
     KOKORO_VOICE,
     KOKORO_VOICES_FILE,
 )
+
+def clean_speech_text(text: str) -> str:
+    """Limpia el texto antes de enviarlo a la síntesis de voz."""
+    if not text:
+        return ""
+    # Eliminar bloques de acción entre corchetes
+    text = re.sub(r"\[.*?\]", "", text)
+    # Eliminar URLs
+    text = re.sub(r"https?://\S+", "", text)
+    # Eliminar caracteres markdown
+    text = re.sub(r"[*_#`~>|-]", " ", text)
+    
+    # En español, '¡' y '¿' al inicio introducen pausas de vacilación excesivas en el motor fonético de Kokoro.
+    # Las eliminamos para que el arranque sea inmediato y natural.
+    text = text.replace("¡", "").replace("¿", "")
+    
+    # Las exclamaciones repetidas ('!!') o muy marcadas fuerzan pausas largas en Kokoro.
+    # Las suavizamos a un punto o coma según contexto.
+    text = re.sub(r"!+", ".", text)
+
+    # Reemplazar múltiples espacios
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def trim_audio_silence(
+    samples: np.ndarray,
+    sample_rate: int = 24000,
+    threshold: float = 0.015,
+    keep_leading_ms: int = 20,
+    keep_trailing_ms: int = 70
+) -> np.ndarray:
+    """Recorta el silencio excesivo tanto al inicio como al final de cada frase.
+    
+    Elimina las pausas largas que los signos de exclamación y puntuación agregan al audio.
+    """
+    if len(samples) == 0:
+        return samples
+    
+    non_silent = np.where(np.abs(samples) > threshold)[0]
+    if len(non_silent) == 0:
+        return samples
+    
+    first_sound = non_silent[0]
+    last_sound = non_silent[-1]
+    
+    leading_keep = int((keep_leading_ms / 1000.0) * sample_rate)
+    trailing_keep = int((keep_trailing_ms / 1000.0) * sample_rate)
+    
+    start_idx = max(0, first_sound - leading_keep)
+    end_idx = min(len(samples), last_sound + trailing_keep)
+    
+    return samples[start_idx:end_idx]
 
 class KokoroSpeaker:
     def __init__(
         self,
         voice: str = KOKORO_VOICE,
         lang: str = KOKORO_LANG,
+        speed: float = KOKORO_SPEED,
         model_file: str = KOKORO_MODEL_FILE,
         voices_file: str = KOKORO_VOICES_FILE,
         enabled: bool = DEFAULT_VOICE_OUTPUT
     ):
         self.voice = voice
         self.lang = lang
+        self.speed = speed
         self.model_file = model_file
         self.voices_file = voices_file
         self.enabled = enabled
-        self.queue: queue.Queue[Optional[str]] = queue.Queue()
+        
+        # Dos colas: una para texto pendiente y otra para audio ya sintetizado
+        self.text_queue: queue.Queue[Optional[str]] = queue.Queue()
+        self.audio_queue: queue.Queue[Optional[Tuple[np.ndarray, int]]] = queue.Queue()
+        
         self._kokoro = None
         self._fallback_sapi = None
         self._is_running = True
         
-        # Iniciar hilo de reproducción en segundo plano
-        self._worker_thread = threading.Thread(target=self._playback_worker, daemon=True)
-        self._worker_thread.start()
+        # 1. Hilo que sintetiza audio por adelantado (para eliminar la espera de inferencia)
+        self._synthesis_thread = threading.Thread(target=self._synthesis_worker, daemon=True)
+        self._synthesis_thread.start()
+        
+        # 2. Hilo que reproduce el audio preparado inmediatamente
+        self._playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
+        self._playback_thread.start()
 
     def is_model_downloaded(self) -> bool:
         """Verifica si existen los archivos del modelo ONNX y las voces."""
@@ -44,7 +109,6 @@ class KokoroSpeaker:
         if self._kokoro is not None or self._fallback_sapi is not None:
             return
 
-        # 1. Intentar Kokoro ONNX
         if self.is_model_downloaded():
             try:
                 from kokoro_onnx import Kokoro
@@ -53,47 +117,78 @@ class KokoroSpeaker:
             except Exception:
                 pass
 
-        # 2. Fallback a voz de Windows SAPI si Kokoro aún no está descargado
         try:
             import win32com.client
             self._fallback_sapi = win32com.client.Dispatch("SAPI.SpVoice")
         except Exception:
             pass
 
-    def _playback_worker(self):
-        """Consume frases de la cola y las sintetiza/reproduce."""
+    def _synthesis_worker(self):
+        """Genera el audio en segundo plano tan pronto llega el texto.
+        
+        De esta forma, la siguiente frase ya está calculada en RAM mientras la actual suena.
+        """
         while self._is_running:
-            sentence = self.queue.get()
-            if sentence is None:
+            text = self.text_queue.get()
+            if text is None:
+                self.audio_queue.put(None)
                 break
-            if not self.enabled or not sentence.strip():
-                self.queue.task_done()
+
+            if not self.enabled or not text.strip():
+                self.text_queue.task_done()
                 continue
 
             try:
                 self._init_tts()
                 if self._kokoro is not None:
-                    import sounddevice as sd
+                    # Generar audio
                     samples, sample_rate = self._kokoro.create(
-                        sentence,
+                        text,
                         voice=self.voice,
-                        speed=1.0,
+                        speed=self.speed,
                         lang=self.lang
                     )
-                    sd.play(samples, sample_rate)
-                    sd.wait()
+                    # Recortar silencios innecesarios de inicio y fin (elimina pausas en ¡! y puntos)
+                    trimmed = trim_audio_silence(samples, sample_rate, threshold=0.015, keep_leading_ms=20, keep_trailing_ms=70)
+                    self.audio_queue.put((trimmed, sample_rate))
                 elif self._fallback_sapi is not None:
-                    self._fallback_sapi.Speak(sentence)
+                    # En fallback SAPI reproducimos directo
+                    self._fallback_sapi.Speak(text)
             except Exception:
-                # Silencioso si ocurre algún error de audio
                 pass
             finally:
-                self.queue.task_done()
+                self.text_queue.task_done()
+
+    def _playback_worker(self):
+        """Reproduce inmediatamente el audio pre-sintetizado sin pausas entre oraciones."""
+        import sounddevice as sd
+        while self._is_running:
+            item = self.audio_queue.get()
+            if item is None:
+                break
+            
+            samples, sample_rate = item
+            try:
+                sd.play(samples, sample_rate)
+                sd.wait()
+            except Exception:
+                pass
+            finally:
+                self.audio_queue.task_done()
 
     def speak(self, text: str):
-        """Añade una frase a la cola para ser hablada."""
-        if self.enabled and text.strip():
-            self.queue.put(text.strip())
+        """Añade una frase a la cola para ser sintetizada."""
+        cleaned = clean_speech_text(text)
+        if self.enabled and cleaned:
+            self.text_queue.put(cleaned)
+
+    def set_voice(self, voice_name: str):
+        """Cambia la voz activa (ej: 'ef_dora', 'em_alex', 'em_santa')."""
+        self.voice = voice_name
+
+    def set_speed(self, speed: float):
+        """Ajusta la velocidad de habla (ej: 0.9, 0.95, 1.0, 1.1)."""
+        self.speed = max(0.5, min(2.0, speed))
 
     def toggle(self) -> bool:
         """Activa o desactiva la voz del asistente."""
@@ -101,6 +196,6 @@ class KokoroSpeaker:
         return self.enabled
 
     def stop(self):
-        """Detiene el hilo del reproductor."""
+        """Detiene los hilos de síntesis y reproducción."""
         self._is_running = False
-        self.queue.put(None)
+        self.text_queue.put(None)

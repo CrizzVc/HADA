@@ -21,9 +21,11 @@ AUDIO_SAMPLE_RATE = 16000  # Frecuencia requerida por Vosk
 # Configuración de Kokoro ONNX (TTS)
 KOKORO_MODEL_FILE = os.getenv("KOKORO_MODEL_FILE", str(KOKORO_DIR / "kokoro-v1.0.onnx"))
 KOKORO_VOICES_FILE = os.getenv("KOKORO_VOICES_FILE", str(KOKORO_DIR / "voices-v1.0.bin"))
-# Voces populares: 'ef_dora', 'em_alex', 'af_sarah', 'af_bella'
+# Voces disponibles en español: 'ef_dora' (femenina natural), 'em_alex' (masculina), 'em_santa'
 KOKORO_VOICE = os.getenv("KOKORO_VOICE", "ef_dora")
 KOKORO_LANG = "es"
+# Velocidad de voz: 0.95 a 1.0 suele ser el punto óptimo para naturalidad y pausas
+KOKORO_SPEED = float(os.getenv("KOKORO_SPEED", "0.95"))
 
 # Comportamiento por defecto
 DEFAULT_VOICE_OUTPUT = True   # Si debe hablar además de escribir

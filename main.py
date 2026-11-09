@@ -100,14 +100,37 @@ def main():
                 _, status = assistant.check_connection()
                 console.print(status)
             continue
+        elif cmd.startswith("/voz_estilo"):
+            parts = user_input.split(maxsplit=1)
+            if len(parts) > 1:
+                new_voice = parts[1].strip()
+                speaker.set_voice(new_voice)
+                console.print(f"[green]Voz cambiada a: {new_voice} (ej: ef_dora, em_alex, em_santa)[/green]")
+            else:
+                console.print(f"[magenta]Voz actual: {speaker.voice}. Voces recomendadas: ef_dora (femenina), em_alex (masculina), em_santa (masculina).[/magenta]")
+            continue
+        elif cmd.startswith("/velocidad"):
+            parts = user_input.split(maxsplit=1)
+            if len(parts) > 1:
+                try:
+                    spd = float(parts[1].strip())
+                    speaker.set_speed(spd)
+                    console.print(f"[green]Velocidad de habla ajustada a: {spd}[/green]")
+                except ValueError:
+                    console.print("[red]Uso: /velocidad 0.95[/red]")
+            else:
+                console.print(f"[magenta]Velocidad actual: {speaker.speed} (Recomendado: 0.9 a 1.0)[/magenta]")
+            continue
         elif cmd == "/ayuda":
             console.print(
                 "[cyan]Comandos:\n"
-                "  /mic             - Hablar por micrófono\n"
-                "  /voz             - Activar/Desactivar voz de Hada\n"
-                "  /modelo [nombre] - Ver o cambiar el modelo de Ollama activo\n"
-                "  /limpiar         - Reiniciar conversación\n"
-                "  /salir           - Salir[/cyan]"
+                "  /mic                - Hablar por micrófono\n"
+                "  /voz                - Activar/Desactivar voz de Hada\n"
+                "  /voz_estilo [voz]   - Cambiar voz (ef_dora, em_alex, etc.)\n"
+                "  /velocidad [valor]  - Ajustar velocidad (ej: 0.95, 1.0)\n"
+                "  /modelo [nombre]    - Ver o cambiar el modelo de Ollama\n"
+                "  /limpiar            - Reiniciar conversación\n"
+                "  /salir              - Salir[/cyan]"
             )
             continue
 

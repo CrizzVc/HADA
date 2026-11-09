@@ -71,6 +71,11 @@ class HadaAssistant:
             "messages": self.history,
             "stream": True,
             "tools": tools,
+            "options": {
+                "temperature": 0.75,
+                "top_p": 0.9,
+                "presence_penalty": 0.4,
+            },
         }
 
         try:
