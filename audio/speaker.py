@@ -65,20 +65,7 @@ def trim_audio_silence(
     start_idx = max(0, first_sound - leading_keep)
     end_idx = min(len(samples), last_sound + trailing_keep)
     
-    trimmed = samples[start_idx:end_idx].copy()
-    
-    # Aplicar fundido suave de entrada (15ms) y salida (25ms) para evitar chasquidos y cortes abruptos
-    fade_in_len = min(int(0.015 * sample_rate), len(trimmed))
-    fade_out_len = min(int(0.025 * sample_rate), len(trimmed))
-    
-    if fade_in_len > 0:
-        fade_in = (np.sin(np.linspace(0, np.pi / 2, fade_in_len)) ** 2).astype(trimmed.dtype)
-        trimmed[:fade_in_len] *= fade_in
-    if fade_out_len > 0:
-        fade_out = (np.cos(np.linspace(0, np.pi / 2, fade_out_len)) ** 2).astype(trimmed.dtype)
-        trimmed[-fade_out_len:] *= fade_out
-        
-    return trimmed
+    return samples[start_idx:end_idx]
 
 class KokoroSpeaker:
     def __init__(
