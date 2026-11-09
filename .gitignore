@@ -1,0 +1,24 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Models and checkpoints (large files)
+models/vosk/*
+!models/vosk/.gitkeep
+models/kokoro/*
+!models/kokoro/.gitkeep
+
+# Temporary audio files
+*.wav
+*.mp3
+
+# Environment and config
+.env
+

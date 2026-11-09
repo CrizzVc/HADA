@@ -1,0 +1,19 @@
+# HTTP requests for Ollama and APIs
+requests>=2.31.0
+
+# Speech-to-Text (STT)
+vosk>=0.3.45
+
+# Audio capture and playback
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+
+# Text-to-Speech (TTS ONNX - Compatible con Python 3.13 y 3.14)
+kokoro-onnx>=0.3.0
+
+# PC Automation & Multimedia controls
+pyautogui>=0.9.54
+
+# Rich Terminal UI
+rich>=13.7.0
