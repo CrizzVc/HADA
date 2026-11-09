@@ -17,38 +17,37 @@ from config import (
 from .voice_cloner import VoiceCloner
 
 def clean_speech_text(text: str) -> str:
-    """Limpia el texto antes de enviarlo a la síntesis de voz."""
+    """Limpia el texto antes de enviarlo a la síntesis de voz, preservando la prosodia expresiva."""
     if not text:
         return ""
     # Eliminar bloques de acción entre corchetes
     text = re.sub(r"\[.*?\]", "", text)
     # Eliminar URLs
     text = re.sub(r"https?://\S+", "", text)
-    # Eliminar caracteres markdown
-    text = re.sub(r"[*_#`~>|-]", " ", text)
+    # Eliminar caracteres markdown (asteriscos, almohadillas, backticks)
+    text = re.sub(r"[*_#`~>|]", " ", text)
     
-    # En español, '¡' y '¿' al inicio introducen pausas de vacilación excesivas en el motor fonético de Kokoro.
-    # Las eliminamos para que el arranque sea inmediato y natural.
-    text = text.replace("¡", "").replace("¿", "")
-    
-    # Las exclamaciones repetidas ('!!') o muy marcadas fuerzan pausas largas en Kokoro.
-    # Las suavizamos a un punto o coma según contexto.
-    text = re.sub(r"!+", ".", text)
+    # Normalizar signos repetidos para evitar pausas excesivas pero preservar la curva tonal:
+    text = re.sub(r"!+", "!", text)
+    text = re.sub(r"\?+", "?", text)
+    # Preservar puntos suspensivos para micro-pausas naturales (máximo 3 puntos)
+    text = re.sub(r"\.{4,}", "...", text)
 
     # Reemplazar múltiples espacios
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[ \t]+", " ", text).strip()
     return text
 
 def trim_audio_silence(
     samples: np.ndarray,
     sample_rate: int = 24000,
-    threshold: float = 0.015,
-    keep_leading_ms: int = 20,
-    keep_trailing_ms: int = 70
+    threshold: float = 0.005,
+    keep_leading_ms: int = 25,
+    keep_trailing_ms: int = 130
 ) -> np.ndarray:
-    """Recorta el silencio excesivo tanto al inicio como al final de cada frase.
+    """Recorta silencios muertos sin producir cortes bruscos ni chasquidos.
     
-    Elimina las pausas largas que los signos de exclamación y puntuación agregan al audio.
+    Aplica una ventana suave de fundido (fade-in / fade-out) en los extremos para que
+    la voz arranque y termine de manera completamente orgánica y continua.
     """
     if len(samples) == 0:
         return samples
@@ -66,7 +65,20 @@ def trim_audio_silence(
     start_idx = max(0, first_sound - leading_keep)
     end_idx = min(len(samples), last_sound + trailing_keep)
     
-    return samples[start_idx:end_idx]
+    trimmed = samples[start_idx:end_idx].copy()
+    
+    # Aplicar fundido suave de entrada (15ms) y salida (25ms) para evitar chasquidos y cortes abruptos
+    fade_in_len = min(int(0.015 * sample_rate), len(trimmed))
+    fade_out_len = min(int(0.025 * sample_rate), len(trimmed))
+    
+    if fade_in_len > 0:
+        fade_in = (np.sin(np.linspace(0, np.pi / 2, fade_in_len)) ** 2).astype(trimmed.dtype)
+        trimmed[:fade_in_len] *= fade_in
+    if fade_out_len > 0:
+        fade_out = (np.cos(np.linspace(0, np.pi / 2, fade_out_len)) ** 2).astype(trimmed.dtype)
+        trimmed[-fade_out_len:] *= fade_out
+        
+    return trimmed
 
 class KokoroSpeaker:
     def __init__(

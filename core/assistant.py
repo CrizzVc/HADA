@@ -121,14 +121,21 @@ class HadaAssistant:
                 full_reply += content
                 sentence_buffer += content
 
-                # Comprobar si completamos una frase para alimentar al TTS
+                # Comprobar si completamos una frase natural para alimentar al TTS
                 match = sentence_end_regex.search(sentence_buffer)
                 if match:
                     end_idx = match.end()
-                    sentence = sentence_buffer[:end_idx].strip()
-                    sentence_buffer = sentence_buffer[end_idx:]
-                    if sentence:
-                        yield (content, sentence)
+                    candidate = sentence_buffer[:end_idx].strip()
+                    words = candidate.split()
+
+                    # Evitar cortes bruscos con fragmentos de 1 o 2 palabras:
+                    # Exigir al menos 4 palabras (o salto de línea) para que Kokoro
+                    # sintetice una curva melódica fluida en lugar de palabras sueltas.
+                    if len(words) >= 4 or "\n" in candidate:
+                        sentence_buffer = sentence_buffer[end_idx:]
+                        yield (content, candidate)
+                    else:
+                        yield (content, None)
                 else:
                     yield (content, None)
 

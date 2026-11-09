@@ -24,8 +24,8 @@ KOKORO_VOICES_FILE = os.getenv("KOKORO_VOICES_FILE", str(KOKORO_DIR / "voices-v1
 # Voces disponibles: estándar ('ef_dora', 'em_alex') o personalizadas en 'voices/' ('Dj_Livi', 'hada_suave')
 KOKORO_VOICE = os.getenv("KOKORO_VOICE", "Dj_Livi")
 KOKORO_LANG = "es"
-# Velocidad de voz: 0.95 a 1.0 suele ser el punto óptimo para naturalidad y pausas
-KOKORO_SPEED = float(os.getenv("KOKORO_SPEED", "0.95"))
+# Velocidad de voz: 1.05 es el punto óptimo para el ritmo ágil y dinámico estilo DJ Livi
+KOKORO_SPEED = float(os.getenv("KOKORO_SPEED", "1.05"))
 
 # Comportamiento por defecto
 DEFAULT_VOICE_OUTPUT = True   # Si debe hablar además de escribir
