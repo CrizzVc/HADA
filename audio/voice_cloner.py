@@ -99,9 +99,9 @@ class VoiceCloner:
             candidate_json = self.voices_dir / f"{target}.json"
         if not candidate_json.exists():
             candidate_json = Path(target)
-        if json_path.exists() and json_path.suffix == ".json":
+        if candidate_json.exists() and candidate_json.suffix == ".json":
             try:
-                with open(json_path, "r", encoding="utf-8") as f:
+                with open(candidate_json, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 return np.array(data, dtype=np.float32)
             except Exception as e:
